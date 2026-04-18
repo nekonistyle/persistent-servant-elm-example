@@ -10,55 +10,27 @@ import Http
 import String
 import Url.Builder
 
-type alias Memo  =
-   { memoTitle: String
-   , memoContent: String
+type alias Message  =
+   { messageTitle: String
+   , messageContent: String
    }
 
-jsonDecMemo : Json.Decode.Decoder ( Memo )
-jsonDecMemo =
-   Json.Decode.succeed (\pmemoTitle pmemoContent -> {memoTitle = pmemoTitle, memoContent = pmemoContent})
-   |> required "memoTitle" (Json.Decode.string)
-   |> required "memoContent" (Json.Decode.string)
+jsonDecMessage : Json.Decode.Decoder ( Message )
+jsonDecMessage =
+   Json.Decode.succeed (\pmessageTitle pmessageContent -> {messageTitle = pmessageTitle, messageContent = pmessageContent})
+   |> required "messageTitle" (Json.Decode.string)
+   |> required "messageContent" (Json.Decode.string)
 
-jsonEncMemo : Memo -> Value
-jsonEncMemo  val =
+jsonEncMessage : Message -> Value
+jsonEncMessage  val =
    Json.Encode.object
-   [ ("memoTitle", Json.Encode.string val.memoTitle)
-   , ("memoContent", Json.Encode.string val.memoContent)
+   [ ("messageTitle", Json.Encode.string val.messageTitle)
+   , ("messageContent", Json.Encode.string val.messageContent)
    ]
 
 
-getAllMemos : (Result Http.Error  ((List Memo))  -> msg) -> Cmd msg
-getAllMemos toMsg =
-    let
-        params =
-            List.filterMap identity
-            (List.concat
-                [])
-    in
-        Http.request
-            { method =
-                "GET"
-            , headers =
-                []
-            , url =
-                Url.Builder.crossOrigin "http://localhost:8080"
-                    [ "allMemos"
-                    ]
-                    params
-            , body =
-                Http.emptyBody
-            , expect =
-                Http.expectJson toMsg (Json.Decode.list (jsonDecMemo))
-            , timeout =
-                Nothing
-            , tracker =
-                Nothing
-            }
-
-postPostMemo : Memo -> (Result Http.Error  (Memo)  -> msg) -> Cmd msg
-postPostMemo body toMsg =
+postAllMessage : (Result Http.Error  ((List Message))  -> msg) -> Cmd msg
+postAllMessage toMsg =
     let
         params =
             List.filterMap identity
@@ -72,13 +44,44 @@ postPostMemo body toMsg =
                 []
             , url =
                 Url.Builder.crossOrigin "http://localhost:8080"
-                    [ "postMemo"
+                    [ "AllMessage"
                     ]
                     params
             , body =
-                Http.jsonBody (jsonEncMemo body)
+                Http.emptyBody
             , expect =
-                Http.expectJson toMsg jsonDecMemo
+                Http.expectJson toMsg (Json.Decode.list (jsonDecMessage))
+            , timeout =
+                Nothing
+            , tracker =
+                Nothing
+            }
+
+postPostMessage : Message -> (Result Http.Error  (())  -> msg) -> Cmd msg
+postPostMessage body toMsg =
+    let
+        params =
+            List.filterMap identity
+            (List.concat
+                [])
+    in
+        Http.request
+            { method =
+                "POST"
+            , headers =
+                []
+            , url =
+                Url.Builder.crossOrigin "http://localhost:8080"
+                    [ "PostMessage"
+                    ]
+                    params
+            , body =
+                Http.jsonBody (jsonEncMessage body)
+            , expect =
+                Http.expectString 
+                     (\x -> case x of
+                     Err e -> toMsg (Err e)
+                     Ok _ -> toMsg (Ok ()))
             , timeout =
                 Nothing
             , tracker =
