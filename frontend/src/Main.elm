@@ -24,29 +24,40 @@ main =
 
 -- MODEL / MSG
 
-type Model
-    = Connecting Access
-    | WritingMessage Message
-    | ShowAllMessage (List Message)
-    | ShowPostMessage ()
+type APIModel
+    = AllMessageModel (List Message)
+    | PostMessageModel ()
 
-type Msg
-    = ChangeMessage Message
-    | AllMessage (APICall () (List Message))
-    | PostMessage (APICall Message ())
+type APIMsg
+    = AllMessageMsg (APICall () (List Message))
+    | PostMessageMsg (APICall Message ())
+
+allMessageAPI : APISet () (List Message) APIMsg
+allMessageAPI = APISet (\_ -> postAllMessage) AllMessageMsg
+
+postMessageAPI : APISet Message () APIMsg
+postMessageAPI = APISet postPostMessage PostMessageMsg
+
+type General
+    = WritingMessage Message
+
+type alias Model
+    = SimpleModel APIModel General
+
+type alias Msg
+    = SimpleMsg APIMsg General
 
 
 -- Call API
 
 callAllMessage : APICall () (List Message) -> (Model,Cmd Msg)
 callAllMessage =
-    useApi Connecting
-        (\_ -> postAllMessage) AllMessage (cmdNone << ShowAllMessage)
+    useAPI allMessageAPI (cmdNone << APIModel << AllMessageModel)
 
 callPostMessage : APICall Message () -> (Model,Cmd Msg)
 callPostMessage =
-    useApi Connecting
-        postPostMessage PostMessage (cmdNone << ShowPostMessage)
+    useAPI postMessageAPI (callAllMessage << Call)
+--    useAPI postMessageAPI (cmdNone << APIModel << PostMessageModel)
 
 
 -- INIT
@@ -58,16 +69,21 @@ init _ = callAllMessage (Call ())
 -- UPDATE
 
 update : Msg -> Model -> (Model, Cmd Msg)
-update msg model =
-    case msg of
-        ChangeMessage message ->
-            (WritingMessage message, Cmd.none)
+update =
+    let
+        apiUpdate api =
+            case api of
+                AllMessageMsg apicall -> callAllMessage apicall
 
-        AllMessage apicall ->
-            callAllMessage apicall
+                PostMessageMsg apicall -> callPostMessage apicall
 
-        PostMessage apicall ->
-            callPostMessage apicall
+        generalUpdate general =
+            case general of
+                WritingMessage message ->
+                    (GeneralModel (WritingMessage message),Cmd.none)
+    in
+        simpleUpdate apiUpdate generalUpdate
+
 
 -- SUBSCRIPTIONS
 
@@ -77,28 +93,29 @@ subscriptions _ =
 
 
 -- VIEW
-
 view : Model -> Html Msg
-view model =
-    case model of
-        Connecting access ->
-            viewAccess access
+view =
+    let
+        apiView api =
+            case api of
+                AllMessageModel messageList -> viewAllMessage messageList
 
-        WritingMessage message ->
-            writeMessage message
+                PostMessageModel _ -> viewPostMessage
 
-        ShowAllMessage messageList ->
-            viewAllMessage messageList
-
-        ShowPostMessage _ ->
-            viewPostMessage
+        generalView general =
+            case general of
+                WritingMessage message -> writeMessage message
+    in
+        simpleView apiView generalView
 
 
 writeMessage : Message -> Html Msg
 writeMessage message =
     div []
-        [ simpleInput ChangeMessage messageTitleLens "title" message
-        , simpleInput ChangeMessage messageContentLens "content" message
+        [ simpleInput (GeneralMsg << WritingMessage)
+              messageTitleLens "title" message
+        , simpleInput (GeneralMsg << WritingMessage)
+            messageContentLens "content" message
         , postMessageButton message
         ]
 
@@ -121,12 +138,12 @@ viewPostMessage =
 
 postNewMessageButton : Html Msg
 postNewMessageButton =
-    simpleButton (ChangeMessage initMessage) "Post New Message"
+    simpleButton (GeneralMsg (WritingMessage initMessage)) "Post New Message"
 
 postMessageButton : Message -> Html Msg
 postMessageButton message =
-    simpleButton (PostMessage (Call message)) "Post" 
+    simpleButton (APIMsg (PostMessageMsg (Call message))) "Post" 
 
 allMessageButton : Html Msg
 allMessageButton =
-    simpleButton (AllMessage (Call ())) "All Messages"
+    simpleButton (APIMsg (AllMessageMsg (Call ()))) "All Messages"
