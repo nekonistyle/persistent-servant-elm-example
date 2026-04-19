@@ -38,11 +38,32 @@ type APICall reqbody response
     = Call reqbody
     | Response (Result Http.Error response)
 
-useApi : (Access -> model) -> (reqbody -> (Result Http.Error response -> msg) -> Cmd msg) -> (APICall reqbody response -> msg) -> (response -> (model,Cmd msg)) -> APICall reqbody response -> (model, Cmd msg)
-useApi connecting apiFunc msgFunc next apicall =
+type alias APISet reqbody response apiMsg
+    = { api : reqbody -> (Result Http.Error response -> apiMsg) -> Cmd apiMsg
+      , msg : APICall reqbody response -> apiMsg
+      }
+
+-- simple Model
+type SimpleModel apiModel general
+    = Connecting Access
+    | APIModel apiModel
+    | GeneralModel general
+
+type SimpleMsg apiMsg general
+    = APIMsg apiMsg
+    | GeneralMsg general
+
+
+useAPI : APISet reqbody response apiMsg
+       -> (response
+          -> (SimpleModel apiModel general, Cmd (SimpleMsg apiMsg general)))
+       -> APICall reqbody response
+       -> (SimpleModel apiModel general, Cmd (SimpleMsg apiMsg general))
+useAPI apiSet next apicall =
     case apicall of
         Call reqbody ->
-            (connecting Loading, apiFunc reqbody (msgFunc << Response))
+            (Connecting Loading
+            ,Cmd.map APIMsg (apiSet.api reqbody (apiSet.msg << Response)))
 
         Response result ->
             case result of
@@ -50,7 +71,34 @@ useApi connecting apiFunc msgFunc next apicall =
                     next resp
 
                 Err err ->
-                    (connecting (Failure err),Cmd.none)
+                    (Connecting (Failure err),Cmd.none)
+
+
+simpleUpdate :
+    (apiMsg -> (SimpleModel apiModel general, Cmd (SimpleMsg apiMsg general)))
+        -> (general
+           -> (SimpleModel apiModel general, Cmd (SimpleMsg apiMsg general)))
+        -> SimpleMsg apiMsg general -> SimpleModel apiModel general
+        -> (SimpleModel apiModel general, Cmd (SimpleMsg apiMsg general))
+simpleUpdate apiUpdate generalUpdate msg model =
+    case msg of
+        APIMsg apimsg -> apiUpdate apimsg
+
+        GeneralMsg generalmsg -> generalUpdate generalmsg
+
+
+simpleView : (apiModel -> Html (SimpleMsg apiMsg general)) ->
+             (general -> Html (SimpleMsg apiMsg general))
+                 -> SimpleModel apiModel general
+                 -> Html (SimpleMsg apiMsg general)
+simpleView apiView generalView model =
+    case model of
+        Connecting access -> viewAccess access
+
+        APIModel apimodel -> apiView apimodel
+
+        GeneralModel generalmodel -> generalView generalmodel
+
 
 maybeResponse : (Access -> model) -> (response -> (model,Cmd msg)) -> Maybe response -> (model,Cmd msg)
 maybeResponse connecting next result =
