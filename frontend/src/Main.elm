@@ -24,28 +24,14 @@ main =
 
 -- MODEL / MSG
 
-type APIModel
-    = AllMessageModel (List Message)
-    | PostMessageModel ()
-
-type APIMsg
-    = AllMessageMsg (APICall () (List Message))
-    | PostMessageMsg (APICall Message ())
-
-allMessageAPI : APISet () (List Message) APIMsg
-allMessageAPI = APISet (\_ -> postAllMessage) AllMessageMsg
-
-postMessageAPI : APISet Message () APIMsg
-postMessageAPI = APISet postPostMessage PostMessageMsg
-
 type General
     = WritingMessage Message
 
 type alias Model
-    = SimpleModel APIModel General
+    = SimpleModel MessageModel General
 
 type alias Msg
-    = SimpleMsg APIMsg General
+    = SimpleMsg MessageMsg General
 
 
 -- Call API
@@ -56,14 +42,14 @@ callAllMessage =
 
 callPostMessage : APICall Message () -> (Model,Cmd Msg)
 callPostMessage =
-    useAPI postMessageAPI (callAllMessage << Call)
+    useAPI postMessageAPI (callAllMessage << Request)
 --    useAPI postMessageAPI (cmdNone << APIModel << PostMessageModel)
 
 
 -- INIT
 
 init : () -> (Model, Cmd Msg)
-init _ = callAllMessage (Call ())
+init _ = callAllMessage (Request ())
 
 
 -- UPDATE
@@ -142,8 +128,8 @@ postNewMessageButton =
 
 postMessageButton : Message -> Html Msg
 postMessageButton message =
-    simpleButton (APIMsg (PostMessageMsg (Call message))) "Post" 
+    simpleButton (APIMsg (PostMessageMsg (Request message))) "Post" 
 
 allMessageButton : Html Msg
 allMessageButton =
-    simpleButton (APIMsg (AllMessageMsg (Call ()))) "All Messages"
+    simpleButton (APIMsg (AllMessageMsg (Request ()))) "All Messages"
