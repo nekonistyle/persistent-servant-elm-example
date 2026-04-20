@@ -35,7 +35,7 @@ httpErrorToString err =
 
 -- API
 type APICall reqbody response
-    = Call reqbody
+    = Request reqbody
     | Response (Result Http.Error response)
 
 type alias APISet reqbody response apiMsg
@@ -61,7 +61,7 @@ useAPI : APISet reqbody response apiMsg
        -> (SimpleModel apiModel general, Cmd (SimpleMsg apiMsg general))
 useAPI apiSet next apicall =
     case apicall of
-        Call reqbody ->
+        Request reqbody ->
             (Connecting Loading
             ,Cmd.map APIMsg (apiSet.api reqbody (apiSet.msg << Response)))
 
